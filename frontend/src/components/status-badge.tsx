@@ -1,6 +1,7 @@
 import type { ArtifactStatus, AuthenticityVerdict } from "@/lib/types";
 
-const BADGE_BASE =
+/** Shared pill styling, reused by claim-state-badge and document chips. */
+export const BADGE_BASE =
   "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset";
 
 const REPORT_STYLES: Record<ArtifactStatus, string> = {

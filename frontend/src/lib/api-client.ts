@@ -30,16 +30,7 @@ function extractDetail(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const { method = "GET", body, signal } = options;
-  const response = await fetch(path, {
-    method,
-    credentials: "same-origin",
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal,
-  });
-
+async function parseOrThrow<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let detail = response.statusText || `Request failed (${response.status})`;
     try {
@@ -51,4 +42,36 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   }
 
   return (await response.json()) as T;
+}
+
+export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  const { method = "GET", body, signal } = options;
+  const response = await fetch(path, {
+    method,
+    credentials: "same-origin",
+    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
+  });
+
+  return parseOrThrow<T>(response);
+}
+
+/**
+ * Multipart upload helper. Content-Type is intentionally NOT set so the
+ * browser adds the multipart boundary itself.
+ */
+export async function apiUpload<T>(
+  path: string,
+  formData: FormData,
+  signal?: AbortSignal,
+): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    body: formData,
+    signal,
+  });
+
+  return parseOrThrow<T>(response);
 }
