@@ -46,7 +46,7 @@ backend/data/chroma/
 backend/uploads/
 
 # --- ml training artifacts (weights/ committed deliberately once, post-training) ---
-ml_training/data/
+backend/ml_training/data/
 kaggle.json
 
 # --- node ---

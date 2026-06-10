@@ -17,9 +17,18 @@ seed:
 
 demo:
 	docker compose up --build -d
+	@echo ""
+	@echo "ClaimFlow demo is starting (backend seeds the demo data before serving)."
+	@echo ""
+	@echo "Portal:     http://localhost:3000"
 	@echo "API health: http://localhost:8000/api/health"
 	@echo "API docs:   http://localhost:8000/docs"
-	@echo "Portal:     http://localhost:3000 (frontend service lands in a later stage)"
+	@echo ""
+	@echo "Demo logins (password: demo1234):"
+	@echo "  claimant@demo.ca     claimant portal"
+	@echo "  imaging@demo.ca      imaging specialist queue"
+	@echo "  specialist@demo.ca   medical specialist queue"
+	@echo "  agent@demo.ca        insurance agent adjudication"
 
 demo-down:
 	docker compose down

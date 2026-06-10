@@ -1,30 +1,32 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { PortalShell } from "@/components/portal-shell";
+import { MandatoryReviewFlag } from "@/components/specialist/verdict-badge";
 import { ReportStatusBadge, VerdictBadge } from "@/components/status-badge";
 import { ApiError, apiFetch } from "@/lib/api-client";
-import type { QueueItem } from "@/lib/types";
+import type { Modality } from "@/lib/types";
+import type { ImagingQueueItem } from "@/lib/types-specialist";
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 5000;
 const QUEUE_PATH = "/api/specialist/queue?stage=imaging";
 
-const MODALITY_LABELS: Record<string, string> = {
+const MODALITY_LABELS: Record<Modality, string> = {
   xray: "X-Ray",
   ct: "CT",
   mri: "MRI",
 };
 
-function modalityLabel(modality: string | null): string {
-  if (modality === null) {
-    return "Unknown";
-  }
-  return MODALITY_LABELS[modality] ?? modality.toUpperCase();
+function modalityLabel(modality: Modality | null): string {
+  return modality !== null ? MODALITY_LABELS[modality] : "Unknown";
 }
 
-export default function ImagingPortalPage() {
-  const [items, setItems] = useState<QueueItem[] | null>(null);
+export default function ImagingQueuePage() {
+  const router = useRouter();
+  const [items, setItems] = useState<ImagingQueueItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
@@ -33,7 +35,7 @@ export default function ImagingPortalPage() {
 
     const load = async () => {
       try {
-        const queue = await apiFetch<QueueItem[]>(QUEUE_PATH);
+        const queue = await apiFetch<ImagingQueueItem[]>(QUEUE_PATH);
         if (!active) {
           return;
         }
@@ -60,9 +62,9 @@ export default function ImagingPortalPage() {
     <PortalShell title="Imaging review queue" subtitle="Claims awaiting imaging analysis review">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-slate-500">
-          {updatedAt ? `Last updated ${updatedAt}` : "Loading queue..."}
+          {updatedAt !== null ? `Last updated ${updatedAt}` : "Loading queue..."}
         </p>
-        {error ? (
+        {error !== null ? (
           <p role="alert" className="text-sm text-red-700">
             {error}
           </p>
@@ -80,6 +82,9 @@ export default function ImagingPortalPage() {
                 Type
               </th>
               <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">
+                Claimant
+              </th>
+              <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">
                 Report
               </th>
               <th scope="col" className="px-4 py-3 text-left font-semibold text-slate-600">
@@ -94,24 +99,37 @@ export default function ImagingPortalPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {items !== null && items.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
-                  No claims waiting for imaging review.
-                </td>
-              </tr>
-            ) : null}
             {items === null ? (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                   Loading...
                 </td>
               </tr>
             ) : null}
+            {items !== null && items.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                  No claims waiting for imaging review.
+                </td>
+              </tr>
+            ) : null}
             {(items ?? []).map((item) => (
-              <tr key={item.claim_id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-mono text-slate-900">{item.claim_ref}</td>
-                <td className="px-4 py-3 text-slate-700">{item.claim_type}</td>
+              <tr
+                key={item.claim_id}
+                onClick={() => router.push(`/imaging/cases/${item.claim_id}`)}
+                className="cursor-pointer hover:bg-slate-50"
+              >
+                <td className="px-4 py-3 font-mono">
+                  <Link
+                    href={`/imaging/cases/${item.claim_id}`}
+                    onClick={(event) => event.stopPropagation()}
+                    className="text-blue-700 hover:underline"
+                  >
+                    {item.claim_ref}
+                  </Link>
+                </td>
+                <td className="px-4 py-3 capitalize text-slate-700">{item.claim_type}</td>
+                <td className="px-4 py-3 text-slate-700">{item.claimant}</td>
                 <td className="px-4 py-3">
                   <ReportStatusBadge status={item.report_status} />
                 </td>
@@ -120,13 +138,7 @@ export default function ImagingPortalPage() {
                   <VerdictBadge verdict={item.authenticity_verdict} />
                 </td>
                 <td className="px-4 py-3">
-                  {item.requires_mandatory_review ? (
-                    <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">
-                      Required
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">Not required</span>
-                  )}
+                  <MandatoryReviewFlag required={item.requires_mandatory_review} />
                 </td>
               </tr>
             ))}
