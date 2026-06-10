@@ -67,7 +67,7 @@ def login(
     return _user_out(user)
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[Depends(enforce_origin)])
 def logout(response: Response) -> dict[str, str]:
     response.delete_cookie(COOKIE_NAME, path="/")
     return {"status": "logged_out"}

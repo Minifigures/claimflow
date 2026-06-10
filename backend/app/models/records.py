@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 from app.models.entities import utcnow
-from app.models.enums import ClaimAction, ClaimState, NotificationStatus, Role, db_enum
+from app.models.enums import ClaimAction, ClaimState, NotificationStatus, db_enum
 
 
 class Decision(Base):

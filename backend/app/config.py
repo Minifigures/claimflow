@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./var/claimflow.sqlite"
     upload_dir: Path = Path("./var/uploads")
 
-    jwt_secret: str = "dev-secret-change-me"
+    jwt_secret: str = "dev-only-secret-change-me-0123456789abcdef"
     jwt_expire_hours: int = 8
     cookie_secure: bool = False
     app_origin: str = "http://localhost:3000"

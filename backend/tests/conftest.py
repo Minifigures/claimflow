@@ -17,7 +17,7 @@ def settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url=f"sqlite:///{tmp_path}/test.sqlite",
         upload_dir=tmp_path / "uploads",
-        jwt_secret="test-secret",
+        jwt_secret="test-secret-0123456789abcdef-0123456789",
         cookie_secure=False,
         email_provider="console",
         model_backend="stub",
