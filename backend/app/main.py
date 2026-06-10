@@ -32,12 +32,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     from app.routers import auth as auth_router
     from app.routers import claims as claims_router
     from app.routers import documents as documents_router
+    from app.routers import agent as agent_router
     from app.routers import specialist as specialist_router
 
     app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
     app.include_router(claims_router.router, prefix="/api/claims", tags=["claims"])
     app.include_router(documents_router.router, prefix="/api/documents", tags=["documents"])
     app.include_router(specialist_router.router, prefix="/api/specialist", tags=["specialist"])
+    app.include_router(agent_router.router, prefix="/api/agent", tags=["agent"])
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
