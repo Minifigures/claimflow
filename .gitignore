@@ -1,0 +1,59 @@
+# --- secrets / env ---
+.env
+.env.*
+!.env.example
+*.pem
+claimflow-secrets.txt
+
+# --- private docs (internal-only; never public) ---
+ASSESSMENT.md
+PRD.md
+docs/PRD*.md
+TECHNICAL_ARCHITECTURE.md
+ARCHITECTURE.md
+docs/TECHNICAL_ARCHITECTURE*.md
+docs/ARCHITECTURE*.md
+DEMO_SCRIPT.md
+docs/DEMO*.md
+docs/REHEARSAL*.md
+DEVPOST_SUBMISSION.md
+docs/DEVPOST*.md
+docs/SUBMISSION*.md
+ROADMAP.md
+docs/ROADMAP*.md
+docs/INTERNAL*.md
+NOTES.md
+TODO.md
+CLAUDE_NOTES.md
+SESSION_NOTES.md
+docs/HANDOFF*.md
+docs/ASSUMPTIONS.md
+*COWORK*.md
+
+# --- python ---
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+mlruns/
+
+# --- runtime data ---
+backend/var/
+backend/data/*.sqlite
+backend/data/chroma/
+backend/uploads/
+
+# --- ml training artifacts (weights/ committed deliberately once, post-training) ---
+ml_training/data/
+kaggle.json
+
+# --- node ---
+node_modules/
+.next/
+*.tsbuildinfo
+
+# --- misc ---
+.DS_Store
+desktop.ini
