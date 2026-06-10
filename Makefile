@@ -23,3 +23,6 @@ demo:
 
 demo-down:
 	docker compose down
+
+dev-web:
+	cd frontend && npm run dev
