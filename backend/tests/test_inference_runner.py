@@ -90,15 +90,20 @@ def test_run_stage1_happy_path(
     assert report.error is None
     assert report.completed_at is not None
     assert report.modality == "xray"
-    assert report.generated_by == "stub-analyzer"
+    assert report.generated_by == "fallback_template"  # keyless stage-1c path
+    assert report.fallback_reason == "no_api_key"
+    assert report.prompt_version == "v1"
     assert report.authenticity_verdict == "authentic"
-    assert report.requires_mandatory_review is False
+    # keyless fallback pins confidence to 0.0, which always flags mandatory review
+    assert report.requires_mandatory_review is True
 
     assert report.payload_json is not None
     payload = json.loads(report.payload_json)
     assert payload["authenticity"]["verdict"] == "authentic"
-    assert payload["source_document"] == document.filename
+    assert payload["classifier"]["modality"] == "xray"
     assert "disclaimer" in payload
+    assert document.filename  # document row still linked to the report
+    assert report.document_id == document.id
 
     assert claim.state == ClaimState.IMAGING_REVIEW
 

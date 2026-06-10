@@ -134,7 +134,8 @@ def test_analyze_completes_stub_pipeline(
     assert report["status"] == "complete"
     assert report["modality"] == "xray"
     assert report["authenticity_verdict"] == "authentic"
-    assert report["requires_mandatory_review"] is False
+    # keyless stage-1c fallback pins confidence to 0.0 -> always mandatory review
+    assert report["requires_mandatory_review"] is True
     assert report["error"] is None
 
     payload = report["payload"]
@@ -208,7 +209,8 @@ def test_specialist_queue_shows_claim_and_guards_roles(
     assert item["report_status"] == "complete"
     assert item["modality"] == "xray"
     assert item["authenticity_verdict"] == "authentic"
-    assert item["requires_mandatory_review"] is False
+    # keyless stage-1c fallback always flags mandatory review (confidence 0.0)
+    assert item["requires_mandatory_review"] is True
 
     assert client.get("/api/specialist/queue", params={"stage": "bogus"}).status_code == 422
 
