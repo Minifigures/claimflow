@@ -146,6 +146,21 @@ def test_metadata_hard_override_forces_at_least_suspicious(
     assert "hard-override" in meta.finding
 
 
+def test_declared_modality_mismatch_forces_at_least_suspicious(
+    weights_dir: Path, settings: Settings, tmp_path: Path
+):
+    """The declared-vs-tag contradiction must fire regardless of what the CNN says."""
+    analyzer = get_analyzer(settings)
+    image = write_png(tmp_path, _gradient_image(), "declared.png")
+    analysis = analyzer.analyze(
+        image, declared_modality="xray", dicom_meta={"Modality": "CT"}
+    )
+    assert analysis.authenticity_verdict in {"suspicious", "likely_fraudulent"}
+    assert analysis.authenticity_risk >= 0.50
+    meta = _signal(analysis, "metadata")
+    assert "declared" in meta.finding and "hard-override" in meta.finding
+
+
 def test_consistent_dicom_metadata_does_not_override(
     weights_dir: Path, settings: Settings, tmp_path: Path
 ):

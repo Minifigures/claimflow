@@ -48,6 +48,7 @@ from app.models import (
     User,
 )
 from app.rag.indexer import index_closed_case
+from app.services.dicom_preview import process_dicom, sniff_kind
 from app.services.inference_runner import run_stage1, run_stage2, run_stage3
 from app.services.notifications.service import render_claim_returned, send_claim_email
 from app.workflow import state_machine
@@ -308,6 +309,16 @@ def _attach_seed_asset(
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / asset_name  # keep the filename ('tampered' drives the demo)
     shutil.copyfile(source, target)
+
+    # Mirror the upload router's DICOM branch: de-identify in place, extract the
+    # safe metadata dict (the analyzer's metadata signal reads it), render preview.
+    sniffed = sniff_kind(target, "")
+    dicom_meta_json: str | None = None
+    preview_path: str | None = None
+    if sniffed == "dicom":
+        meta, preview_path = process_dicom(target)
+        dicom_meta_json = json.dumps(meta)
+    mime = {"dicom": "application/dicom", "png": "image/png", "jpeg": "image/jpeg"}[sniffed]
     data = target.read_bytes()
 
     document = Document(
@@ -316,10 +327,12 @@ def _attach_seed_asset(
         kind=DocumentKind.IMAGING,
         modality=modality,
         filename=asset_name,
-        mime="image/png",
+        mime=mime,
         size_bytes=len(data),
         sha256=hashlib.sha256(data).hexdigest(),
         storage_path=str(target),
+        preview_path=preview_path,
+        dicom_meta_json=dicom_meta_json,
     )
     session.add(document)
     session.flush()
@@ -614,13 +627,15 @@ def seed_fixtures(session: Session, settings: Settings) -> list[str]:
         incident_date=date(2026, 5, 12),
     )
 
-    # b. THE DEMO STAR: tampered x-ray flagged likely_fraudulent in IMAGING_REVIEW.
+    # b. THE DEMO STAR: a tampered study (copy-move + splice on a real x-ray, wrapped
+    # in a DICOM whose Modality tag says CT) flagged non-authentic in IMAGING_REVIEW.
+    # stub: filename hook -> likely_fraudulent; real: CNN + metadata override -> suspicious.
     tampered = _submit_with_imaging(
         session,
         settings,
         claimant=claimant,
         claim_ref=REF_IMAGING_TAMPERED,
-        asset_name="tampered_xray.png",
+        asset_name="tampered_xray.dcm",
         modality=Modality.XRAY,
         procedure_code="IMG-201",
         diagnosis_code="S82.1",
@@ -631,8 +646,9 @@ def seed_fixtures(session: Session, settings: Settings) -> list[str]:
     tampered_report = _latest_complete_report(session, tampered.id)
     _expect(
         tampered_report is not None
-        and tampered_report.authenticity_verdict == "likely_fraudulent",
-        f"{REF_IMAGING_TAMPERED}: expected likely_fraudulent verdict",
+        and tampered_report.authenticity_verdict in ("suspicious", "likely_fraudulent"),
+        f"{REF_IMAGING_TAMPERED}: expected a non-authentic verdict, got "
+        f"{tampered_report.authenticity_verdict if tampered_report else 'no report'}",
     )
 
     # c. SPECIALIST_REVIEW: clean CT forwarded by the imaging specialist.

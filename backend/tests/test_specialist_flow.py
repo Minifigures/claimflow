@@ -30,7 +30,7 @@ from app.models import (
 )
 from tests.conftest import login
 
-SEED_TAMPERED = Path(__file__).resolve().parents[1] / "seed-assets" / "tampered_xray.png"
+SEED_TAMPERED = Path(__file__).resolve().parents[1] / "seed-assets" / "tampered_xray.dcm"
 
 CLAIM_BODY = {
     "claim_type": "imaging",
@@ -296,7 +296,7 @@ def test_tampered_image_forces_further_testing_and_mandatory_review(
 ) -> None:
     assert SEED_TAMPERED.is_file()
     claim = _claim_in_imaging_review(
-        client, session, users, tmp_path, filename="tampered_xray.png", source=SEED_TAMPERED
+        client, session, users, tmp_path, filename="tampered_xray.dcm", source=SEED_TAMPERED
     )
 
     report = session.scalar(

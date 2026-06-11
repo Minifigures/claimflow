@@ -200,12 +200,16 @@ def _fft_periodicity(gray: np.ndarray) -> tuple[float, str]:
 
 
 def _metadata_consistency(
-    dicom_meta: dict | None, predicted_modality: str, is_dicom: bool
+    dicom_meta: dict | None,
+    predicted_modality: str,
+    declared_modality: str | None,
+    is_dicom: bool,
 ) -> tuple[float, str, bool]:
     """Score metadata coherence; returns (score, finding, hard_override).
 
     hard_override fires when the DICOM Modality tag maps to a known modality that
-    contradicts the CNN prediction — the strongest single fraud tell we have.
+    contradicts either the CNN prediction or the claimant's declared modality —
+    the strongest single fraud tells we have, and neither depends on model luck.
     """
     if not dicom_meta:
         if is_dicom:
@@ -213,6 +217,13 @@ def _metadata_consistency(
         return 0.20, "No acquisition metadata available (non-DICOM upload).", False
 
     tag_modality = _DICOM_MODALITY_MAP.get(str(dicom_meta.get("Modality", "")).upper())
+    if tag_modality is not None and declared_modality and tag_modality != declared_modality:
+        return (
+            0.90,
+            f"DICOM Modality tag ({tag_modality}) contradicts the declared "
+            f"modality ({declared_modality}) — metadata hard-override.",
+            True,
+        )
     if tag_modality is not None and tag_modality != predicted_modality:
         return (
             0.90,
@@ -263,7 +274,7 @@ class RealAnalyzer:
         ela_score, ela_finding = _ela_localization(gray)
         fft_score, fft_finding = _fft_periodicity(gray)
         meta_score, meta_finding, hard_override = _metadata_consistency(
-            dicom_meta, modality, is_dicom
+            dicom_meta, modality, declared_modality, is_dicom
         )
 
         forensic = (

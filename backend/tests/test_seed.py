@@ -172,9 +172,11 @@ def test_fixtures_create_exactly_seven_claims_in_the_right_states(
     assert actual == FIXTURE_STATES
 
 
-def test_tampered_claim_report_is_likely_fraudulent(
+def test_tampered_claim_report_is_flagged(
     seeded: tuple[Session, Settings, SeedSummary],
 ) -> None:
+    """Non-authentic either way: the stub's filename hook says likely_fraudulent,
+    the real fusion lands suspicious via CNN + metadata hard-override."""
     session, _, _ = seeded
     claim = _claim_by_ref(session, REF_IMAGING_TAMPERED)
     report = session.scalar(
@@ -184,10 +186,12 @@ def test_tampered_claim_report_is_likely_fraudulent(
         .limit(1)
     )
     assert report is not None
-    assert report.authenticity_verdict == "likely_fraudulent"
+    assert report.authenticity_verdict in ("suspicious", "likely_fraudulent")
     assert report.requires_mandatory_review is True
     document = session.scalar(select(Document).where(Document.claim_id == claim.id))
     assert document is not None and "tampered" in document.filename
+    assert document.mime == "application/dicom"
+    assert document.dicom_meta_json is not None  # metadata signal feeds on this
 
 
 def test_specialist_and_adjudication_artifacts_are_complete(
