@@ -3,19 +3,21 @@ FROM python:3.12-slim
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
 
 COPY pyproject.toml ./
-# CPU-only torch first (the rag extra's sentence-transformers depends on torch; the
-# default PyPI wheel drags in the CUDA stack), then base deps + the rag extra so the
-# demo seeder can index precedents into Chroma.
+# CPU-only torch/torchvision first (sentence-transformers and timm depend on them;
+# the default PyPI wheels drag in the CUDA stack), then base deps + the rag extra
+# (Chroma precedent indexing) + the ml extra (MODEL_BACKEND=real CNN inference).
 RUN pip install --no-cache-dir uv \
-    && uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu \
-    && uv pip install --system -r pyproject.toml --extra rag
+    && uv pip install --system torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+    && uv pip install --system -r pyproject.toml --extra rag --extra ml
 
-# Pre-bake the embedding model so seeding works offline on first boot.
-RUN python -c "from sentence_transformers import SentenceTransformer; \
-    SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+# Vendored models: the MiniLM embedder snapshot + the trained CNN weights ship in
+# the repo, so the image builds and serves with no Hugging Face network access.
+COPY weights/ weights/
 
 COPY app/ app/
 COPY scripts/ scripts/
