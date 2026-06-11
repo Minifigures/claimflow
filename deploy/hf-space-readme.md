@@ -21,3 +21,7 @@ https://github.com/Minifigures/claimflow (see its README for the full system).
 Space variables expected: `MODEL_BACKEND=real`, `APP_ORIGIN=<vercel url>`,
 `COOKIE_SECURE=true`; secrets: `JWT_SECRET`, `GEMINI_API_KEY` (free-tier live
 LLM lane; deterministic fallbacks when absent).
+
+**Split-deploy invariant:** `JWT_SECRET` here MUST be byte-identical to the
+`JWT_SECRET` env var on the Vercel frontend — the Next middleware verifies the
+session cookie this backend signs. A mismatch bounces every login silently.

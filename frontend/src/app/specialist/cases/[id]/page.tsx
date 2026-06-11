@@ -23,14 +23,17 @@ export default function SpecialistCasePage() {
 
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fatal, setFatal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Poll while any stage-1 report or stage-2 note is still being produced.
+  // Poll while any stage-1 report or stage-2 note is still being produced;
+  // a 403/404 is permanent, so stop instead of hammering the API forever.
   const shouldPoll =
-    detail === null ||
-    [...detail.diagnostic_reports, ...detail.recommendation_notes].some(
-      (artifact) => artifact.status === "pending" || artifact.status === "running",
-    );
+    !fatal &&
+    (detail === null ||
+      [...detail.diagnostic_reports, ...detail.recommendation_notes].some(
+        (artifact) => artifact.status === "pending" || artifact.status === "running",
+      ));
 
   useEffect(() => {
     if (invalidId) {
@@ -51,7 +54,14 @@ export default function SpecialistCasePage() {
         if (!active) {
           return;
         }
-        setError(err instanceof ApiError ? err.detail : "Unable to reach the API.");
+        if (err instanceof ApiError) {
+          setError(err.detail);
+          if (err.status === 403 || err.status === 404) {
+            setFatal(true);
+          }
+        } else {
+          setError("Unable to reach the API.");
+        }
       }
     };
 
