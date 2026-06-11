@@ -17,11 +17,31 @@ const ROLE_HOME: Record<Role, string> = {
 
 const DEMO_PASSWORD = "demo1234";
 
-const DEMO_ACCOUNTS: ReadonlyArray<{ label: string; email: string; hint: string }> = [
-  { label: "Claimant", email: "claimant@demo.ca", hint: "submit & track claims" },
-  { label: "Imaging specialist", email: "imaging@demo.ca", hint: "review forensic signals" },
-  { label: "Medical specialist", email: "specialist@demo.ca", hint: "weigh the evidence" },
-  { label: "Insurance agent", email: "agent@demo.ca", hint: "make the final call" },
+const DEMO_ACCOUNTS: ReadonlyArray<{
+  label: string;
+  tag: string;
+  email: string;
+  hint: string;
+}> = [
+  { label: "Claimant", tag: "default", email: "claimant@demo.ca", hint: "submit & track claims" },
+  {
+    label: "Imaging specialist",
+    tag: "portal 1",
+    email: "imaging@demo.ca",
+    hint: "review forensic signals",
+  },
+  {
+    label: "Medical specialist",
+    tag: "portal 2",
+    email: "specialist@demo.ca",
+    hint: "weigh the evidence",
+  },
+  {
+    label: "Insurance agent",
+    tag: "portal 3",
+    email: "agent@demo.ca",
+    hint: "make the final call",
+  },
 ];
 
 const PIPELINE: ReadonlyArray<{ numeral: string; line: string }> = [
@@ -115,8 +135,13 @@ export default function LoginPage() {
                 onClick={() => void signIn(account.email, DEMO_PASSWORD)}
                 className="group rounded-sm border border-slate-300 bg-white px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-blue-700 hover:shadow-sm disabled:opacity-50"
               >
-                <span className="block text-sm font-semibold text-slate-800 group-hover:text-blue-900">
-                  {account.label}
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-semibold text-slate-800 group-hover:text-blue-900">
+                    {account.label}
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-blue-700">
+                    {account.tag}
+                  </span>
                 </span>
                 <span className="mt-0.5 block font-mono text-[11px] text-slate-500">
                   {account.hint}
