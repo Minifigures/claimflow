@@ -1,10 +1,11 @@
-"""Materialize git-LFS pointer files at container start (Hugging Face Spaces).
+"""Verify runtime binary assets at container start; re-fetch any that are invalid.
 
-The Space build context delivers some binary files as LFS pointers rather than
-real bytes (storage-class dependent and not under our control). Anything the
-app needs at runtime — seed assets, model weights — is scanned here; pointer
-files are replaced with the real content via the hub API, which resolves them
-reliably. Local and compose runs have real files on disk, so this is a no-op.
+Hugging Face Space builds can deliver repo binaries in surprising states
+(git-LFS pointers, xet pointers, partial materialization) depending on storage
+class — outside our control and version-dependent. Instead of guessing storage
+formats, every asset the app needs is validated by its content magic; anything
+invalid is downloaded through the hub API, which resolves storage correctly.
+Local and compose runs have real files on disk, so this is a no-op.
 
 Runs before the seeder in the image CMD chain.
 """
@@ -13,36 +14,67 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-
-POINTER_MAGIC = b"version https://git-lfs"
-SCAN_DIRS = ("seed-assets", "weights")
+from typing import Callable
 
 
-def _pointer_files() -> list[Path]:
-    found: list[Path] = []
-    for scan in SCAN_DIRS:
-        root = Path(scan)
-        if not root.exists():
+def _png(data: bytes) -> bool:
+    return data.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def _dicom(data: bytes) -> bool:
+    return len(data) >= 132 and data[128:132] == b"DICM"
+
+
+def _torch_zip(data: bytes) -> bool:
+    return data.startswith(b"PK")
+
+
+def _safetensors(data: bytes) -> bool:
+    # 8-byte little-endian header length followed by a JSON header.
+    return len(data) > 8 and data[8:9] == b"{"
+
+
+REQUIRED: dict[str, Callable[[bytes], bool]] = {
+    "seed-assets/clean_ct.png": _png,
+    "seed-assets/clean_mri.png": _png,
+    "seed-assets/clean_xray.png": _png,
+    "seed-assets/tampered_xray.dcm": _dicom,
+    "weights/modality_efficientnet_b0.pt": _torch_zip,
+    "weights/authenticity_efficientnet_b0.pt": _torch_zip,
+    "weights/all-MiniLM-L6-v2/model.safetensors": _safetensors,
+}
+
+
+def _invalid_assets() -> list[str]:
+    bad: list[str] = []
+    for rel, check in REQUIRED.items():
+        path = Path(rel)
+        if not path.is_file():
+            print(f"[bootstrap] MISSING: {rel}", flush=True)
+            bad.append(rel)
             continue
-        for path in root.rglob("*"):
-            if path.is_file():
-                with path.open("rb") as fh:
-                    if fh.read(len(POINTER_MAGIC)) == POINTER_MAGIC:
-                        found.append(path)
-    return found
+        with path.open("rb") as fh:
+            head = fh.read(160)
+        if not check(head):
+            print(
+                f"[bootstrap] INVALID: {rel} size={path.stat().st_size} "
+                f"head={head[:24].hex()} text={head[:24]!r}",
+                flush=True,
+            )
+            bad.append(rel)
+    return bad
 
 
 def main() -> None:
-    pointers = _pointer_files()
-    if not pointers:
-        print("[bootstrap] all binary assets are materialized; nothing to do", flush=True)
+    bad = _invalid_assets()
+    if not bad:
+        print("[bootstrap] all required assets valid; nothing to do", flush=True)
         return
 
     repo_id = os.environ.get("SPACE_ID")  # injected by Spaces, e.g. "Minifigures/claimflow-api"
     if repo_id is None:
         raise SystemExit(
-            f"[bootstrap] {len(pointers)} LFS pointer files found but SPACE_ID is unset; "
-            f"cannot resolve: {[str(p) for p in pointers]}"
+            f"[bootstrap] {len(bad)} invalid assets and SPACE_ID unset; cannot resolve: {bad}"
         )
 
     # The image pins offline mode for serving; this one bootstrap step needs the hub.
@@ -50,11 +82,17 @@ def main() -> None:
     os.environ.pop("TRANSFORMERS_OFFLINE", None)
     from huggingface_hub import hf_hub_download
 
-    for path in pointers:
-        print(f"[bootstrap] resolving LFS pointer: {path}", flush=True)
-        resolved = hf_hub_download(repo_id=repo_id, repo_type="space", filename=str(path))
-        path.write_bytes(Path(resolved).read_bytes())
-    print(f"[bootstrap] materialized {len(pointers)} files", flush=True)
+    for rel in bad:
+        print(f"[bootstrap] fetching from hub: {rel}", flush=True)
+        resolved = hf_hub_download(
+            repo_id=repo_id, repo_type="space", filename=rel, force_download=True
+        )
+        Path(rel).write_bytes(Path(resolved).read_bytes())
+
+    still_bad = _invalid_assets()
+    if still_bad:
+        raise SystemExit(f"[bootstrap] assets still invalid after hub fetch: {still_bad}")
+    print(f"[bootstrap] repaired {len(bad)} assets from the hub", flush=True)
 
 
 if __name__ == "__main__":
