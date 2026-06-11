@@ -13,7 +13,10 @@ const OUT = process.env.SHOT_DIR ?? "../docs/screenshots";
 const PASSWORD = "demo1234";
 
 // Seed order is fixed, so claim ids are stable: CLM-DEMO-000N has id N.
+// email: null entries are public pages captured without logging in.
 const SHOTS = [
+  { email: null, path: "/", name: "landing", full: true },
+  { email: null, path: "/login", name: "login", full: false },
   { email: "imaging@demo.ca", path: "/imaging", name: "imaging-queue", full: false },
   { email: "imaging@demo.ca", path: "/imaging/cases/2", name: "imaging-tampered-case", full: true },
   { email: "claimant@demo.ca", path: "/claimant", name: "claimant-portal", full: false },
@@ -25,16 +28,18 @@ const SHOTS = [
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
 
-const byRole = SHOTS.reduce((acc, s) => ((acc[s.email] ??= []).push(s), acc), {});
+const byRole = SHOTS.reduce((acc, s) => ((acc[s.email ?? "public"] ??= []).push(s), acc), {});
 for (const [email, shots] of Object.entries(byRole)) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
 
-  await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', PASSWORD);
-  await page.click('button[type="submit"]');
-  await page.waitForURL((url) => !url.pathname.includes("login"), { timeout: 15000 });
+  if (email !== "public") {
+    await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+    await page.fill('input[type="email"]', email);
+    await page.fill('input[type="password"]', PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForURL((url) => !url.pathname.includes("login"), { timeout: 15000 });
+  }
 
   for (const shot of shots) {
     await page.goto(`${BASE}${shot.path}`, { waitUntil: "networkidle" });

@@ -1,6 +1,107 @@
 @import "tailwindcss";
 
-@theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/*
+ * ClaimFlow design tokens — "clinical ledger".
+ * Warm paper neutrals carry the page; deep ink-navy is the single accent;
+ * verdict colors are tuned to clinical, slightly desaturated tones. The
+ * default slate/blue ramps are overridden so every existing utility class
+ * participates in the system without per-page edits.
+ */
+@theme {
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-display: var(--font-fraunces), Georgia, serif;
+
+  /* paper-and-ink neutrals (replaces slate) */
+  --color-slate-50: #faf8f3;
+  --color-slate-100: #f1ede4;
+  --color-slate-200: #e2dccd;
+  --color-slate-300: #c8c0ac;
+  --color-slate-400: #98917e;
+  --color-slate-500: #6c685c;
+  --color-slate-600: #4c4a42;
+  --color-slate-700: #35342e;
+  --color-slate-800: #22211d;
+  --color-slate-900: #131310;
+
+  /* ink navy accent (replaces blue) */
+  --color-blue-50: #eef2f7;
+  --color-blue-100: #dce4ee;
+  --color-blue-200: #c0cfe0;
+  --color-blue-300: #93abc7;
+  --color-blue-400: #5e80a5;
+  --color-blue-500: #355d87;
+  --color-blue-600: #20436a;
+  --color-blue-700: #173455;
+  --color-blue-800: #102843;
+  --color-blue-900: #0b1d33;
+
+  /* clinical verdict tones */
+  --color-emerald-50: #edf5ef;
+  --color-emerald-200: #c2dcc9;
+  --color-emerald-600: #2e6f4e;
+  --color-emerald-700: #265c41;
+  --color-amber-50: #faf3e3;
+  --color-amber-200: #ecd9a8;
+  --color-amber-300: #dfc183;
+  --color-amber-500: #b98a2e;
+  --color-amber-600: #9a6f1f;
+  --color-amber-700: #7c5817;
+  --color-amber-900: #4f3a12;
+  --color-red-50: #f9eeec;
+  --color-red-200: #e8c5bf;
+  --color-red-600: #993326;
+  --color-red-700: #7e2a1f;
+}
+
+/* Page-load reveal: applied per-element with stagger via --rise-delay. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.anim-rise {
+  opacity: 0;
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--rise-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Faint dot-grid texture for hero surfaces. */
+.paper-grid {
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--color-slate-400) 28%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+}
+
+/* Ink panel texture: deep navy with a soft radial wash and faint grid. */
+.ink-panel {
+  background-color: var(--color-blue-900);
+  background-image:
+    radial-gradient(
+      ellipse 80% 60% at 20% 0%,
+      color-mix(in srgb, var(--color-blue-500) 35%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      color-mix(in srgb, var(--color-blue-300) 14%, transparent) 1px,
+      transparent 1px
+    );
+  background-size:
+    auto,
+    26px 26px;
 }
