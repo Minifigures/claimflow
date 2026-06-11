@@ -88,7 +88,7 @@ Without Docker: `make install && make seed && make dev-api` and `make dev-web` (
 
 ```bash
 make test   # backend: pytest (state machine matrix, audit tamper, PII guards,
-            # injection cases, real-CNN serving path, full lifecycle E2E) — 251 tests
+            # injection cases, real-CNN serving path, full lifecycle E2E) — 242 tests
 make lint
 cd frontend && npx tsc --noEmit && npm run build
 ```
