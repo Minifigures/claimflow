@@ -4,15 +4,33 @@ A human-in-the-loop medical insurance claims prototype: three review portals, th
 
 ## How it works
 
-```
-Claimant upload ──> [Stage 1] modality classification + authenticity forensics
-                              + drafted diagnostic report ──> Imaging specialist
-                              (forward / return to claimant)
-                ──> [Stage 2] LLM recommendation note over all case documents
-                              ──> Medical specialist (send to insurer / further testing)
-                ──> [Stage 3] adjudication summary: claimant history (SQL) +
-                              anonymized similar-case precedents (vector retrieval)
-                              ──> Insurance agent (approve / reject + email, atomic)
+```mermaid
+flowchart TB
+    UP["Claimant portal: claim wizard, document upload<br/>(DICOM / PNG / JPEG / PDF)"]
+    GATE["Intake gate: magic-byte sniffing,<br/>DICOM PHI de-identification at rest"]
+    subgraph S1["Stage 1, imaging analysis (automatic on submit)"]
+        CNN["Modality CNN<br/>EfficientNet-B0, calibrated<br/>94.2% test accuracy"]
+        FUSE["Authenticity fusion<br/>CNN capped at 0.40 + ELA + FFT + metadata<br/>DICOM-tag hard override"]
+        REP["Drafted diagnostic report<br/>Claude vision route, deterministic fallback"]
+    end
+    IMG["Imaging specialist portal<br/>forward / return to claimant"]
+    subgraph S2["Stage 2, recommendation note"]
+        NOTE["Claude reads report + PDFs + per-claimant retrieval<br/>supports / insufficient / further testing"]
+    end
+    MED["Medical specialist portal<br/>send to insurer / request further testing"]
+    subgraph S3["Stage 3, adjudication support"]
+        SUM["Claude summary over SQL claimant history +<br/>anonymized cross-claimant precedents (ChromaDB)"]
+    end
+    AGENT["Insurance agent portal<br/>approve / reject, decision + state + audit + email commit atomically"]
+    AUDIT["Hash-chained, actor-aware audit log<br/>every transition, model call, retrieval, email"]
+
+    UP --> GATE --> S1 --> IMG --> S2 --> MED --> S3 --> AGENT
+    IMG -. "return" .-> UP
+    MED -. "further testing" .-> UP
+    S1 --- AUDIT
+    S2 --- AUDIT
+    S3 --- AUDIT
+    AGENT --- AUDIT
 ```
 
 Every workflow transition, model call, retrieval, and email is recorded in a hash-chained, actor-aware audit log; tampering with any record (including *who* acted) breaks the chain.
