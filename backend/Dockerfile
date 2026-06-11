@@ -23,8 +23,11 @@ COPY app/ app/
 COPY scripts/ scripts/
 COPY seed-assets/ seed-assets/
 RUN pip install --no-cache-dir --no-deps . \
-    && mkdir -p var
+    && mkdir -p var \
+    && chown -R 1000:1000 /app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:get_application", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# Standalone runs (e.g. Hugging Face Spaces, which runs containers as uid 1000)
+# seed the demo data before serving; compose overrides this with the same chain.
+CMD ["sh", "-c", "python -m scripts.seed && uvicorn app.main:get_application --factory --host 0.0.0.0 --port 8000"]
