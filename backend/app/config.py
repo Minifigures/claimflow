@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     model_backend: str = "stub"  # stub | real
     weights_dir: Path = Path("./weights")
     anthropic_api_key: str = ""
+    gemini_api_key: str = ""  # free-tier lane; anthropic wins when both are set
+    gemini_model: str = "gemini-2.5-flash"
 
     chroma_dir: Path = Path("./var/chroma")
 

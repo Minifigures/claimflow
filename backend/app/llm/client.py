@@ -1,8 +1,12 @@
-"""Keyed-path LLM client: routed `messages.parse()` calls with audit, retry, and cost.
+"""Keyed-path LLM client: routed structured calls with audit, retry, and cost.
 
-Every attempt (including refusals and truncations) is appended to the hash-chained
-audit log; the caller owns the transaction and commits. Raw prompt/response text is
-never stored in audit payloads — only sha256 digests and token/cost accounting.
+Provider-pluggable: Anthropic (primary, Claude routing per stage) with a Gemini
+free-tier lane when only GEMINI_API_KEY is configured. Both providers share the
+same audit, truncation-retry, refusal, and schema-validation semantics, so the
+stages cannot tell them apart. Every attempt (including refusals and truncations)
+is appended to the hash-chained audit log; the caller owns the transaction and
+commits. Raw prompt/response text is never stored in audit payloads — only
+sha256 digests and token/cost accounting.
 """
 
 from __future__ import annotations
@@ -26,7 +30,7 @@ _CHARS_PER_TOKEN = 4
 
 
 class LLMUnavailableError(Exception):
-    """No API key configured or the anthropic SDK is not importable."""
+    """No usable provider (missing keys/SDK) or the provider transport failed."""
 
 
 class LLMRefusalError(Exception):
@@ -46,15 +50,28 @@ class InputTooLargeError(Exception):
     """Estimated input tokens exceed the crude pre-flight gate."""
 
 
+def resolve_provider(settings: Settings) -> str | None:
+    """Pick the live provider: Anthropic when its key is usable, else Gemini, else None."""
+    if settings.anthropic_api_key:
+        try:
+            import anthropic  # noqa: F401
+
+            return "anthropic"
+        except ImportError:
+            pass
+    if settings.gemini_api_key:
+        try:
+            import httpx  # noqa: F401
+
+            return "gemini"
+        except ImportError:
+            pass
+    return None
+
+
 def llm_available(settings: Settings) -> bool:
-    """True iff an API key is configured and the anthropic SDK is importable."""
-    if not settings.anthropic_api_key:
-        return False
-    try:
-        import anthropic  # noqa: F401
-    except ImportError:
-        return False
-    return True
+    """True iff some provider has a configured key and an importable transport."""
+    return resolve_provider(settings) is not None
 
 
 @dataclass(frozen=True)
@@ -106,8 +123,9 @@ def generate(
     prompt_sha256: str,
 ) -> LLMResult:
     """Run one routed, structured LLM call; audit every attempt (caller commits)."""
-    if not llm_available(settings):
-        raise LLMUnavailableError("anthropic API key missing or SDK not installed")
+    provider = resolve_provider(settings)
+    if provider is None:
+        raise LLMUnavailableError("no LLM provider configured (anthropic or gemini key)")
 
     estimated = _estimated_input_tokens(user_content)
     if estimated > MAX_INPUT_EST_TOKENS:
@@ -115,12 +133,8 @@ def generate(
             f"estimated {estimated} input tokens exceeds gate of {MAX_INPUT_EST_TOKENS}"
         )
 
-    import anthropic
-
     route = routing.get_route(route_name)
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key).with_options(
-        timeout=90.0, max_retries=2
-    )
+    model_name = route.model if provider == "anthropic" else settings.gemini_model
     input_sha256, image_sha256 = _hash_user_content(user_content)
 
     def record(
@@ -140,7 +154,7 @@ def generate(
             actor_role="system",
             payload={
                 "route": route_name,
-                "model": route.model,
+                "model": model_name,
                 "prompt_version": prompt_version,
                 "prompt_sha256": prompt_sha256,
                 "input_sha256": input_sha256,
@@ -161,6 +175,103 @@ def generate(
     total_output = 0
     total_cost = 0.0
     total_latency = 0
+
+    if provider == "gemini":
+        from app.llm import gemini as gemini_provider
+
+        response_schema = schema.model_json_schema()
+        while True:
+            start = time.perf_counter()
+            try:
+                outcome = gemini_provider.call_gemini(
+                    api_key=settings.gemini_api_key,
+                    model=model_name,
+                    system=system,
+                    user_content=user_content,
+                    response_schema=response_schema,
+                    max_tokens=max_tokens,
+                )
+            except Exception as exc:
+                # Transport/HTTP failures degrade to the deterministic fallback
+                # (stages catch LLMUnavailableError), never fail the stage.
+                raise LLMUnavailableError(f"gemini call failed: {exc}") from exc
+            latency_ms = int((time.perf_counter() - start) * 1000)
+
+            cost_usd = routing.estimate_cost(model_name, outcome.input_tokens, outcome.output_tokens)
+            total_input += outcome.input_tokens
+            total_output += outcome.output_tokens
+            total_cost += cost_usd
+            total_latency += latency_ms
+
+            if outcome.stop_reason == "refusal":
+                record(
+                    stop_reason="refusal",
+                    retried=retried,
+                    input_tokens=outcome.input_tokens,
+                    output_tokens=outcome.output_tokens,
+                    cost_usd=cost_usd,
+                    latency_ms=latency_ms,
+                    response_sha256=None,
+                )
+                raise LLMRefusalError(category=outcome.refusal_detail, explanation=None)
+
+            if outcome.stop_reason == "max_tokens":
+                record(
+                    stop_reason="max_tokens",
+                    retried=retried,
+                    input_tokens=outcome.input_tokens,
+                    output_tokens=outcome.output_tokens,
+                    cost_usd=cost_usd,
+                    latency_ms=latency_ms,
+                    response_sha256=None,
+                )
+                if retried or max_tokens >= MAX_TOKENS_CAP:
+                    raise LLMTruncatedError(
+                        f"route {route_name!r} truncated at max_tokens={max_tokens}"
+                    )
+                retried = True
+                max_tokens = min(max_tokens * 2, MAX_TOKENS_CAP)
+                continue
+
+            try:
+                parsed = gemini_provider.parse_or_raise(outcome.text, schema)
+            except Exception:
+                record(
+                    stop_reason="parse_error",
+                    retried=retried,
+                    input_tokens=outcome.input_tokens,
+                    output_tokens=outcome.output_tokens,
+                    cost_usd=cost_usd,
+                    latency_ms=latency_ms,
+                    response_sha256=_sha256(outcome.text),
+                )
+                raise  # ValidationError: stages catch it into their fallback
+
+            record(
+                stop_reason="end_turn",
+                retried=retried,
+                input_tokens=outcome.input_tokens,
+                output_tokens=outcome.output_tokens,
+                cost_usd=cost_usd,
+                latency_ms=latency_ms,
+                response_sha256=_sha256(parsed.model_dump_json()),
+            )
+            return LLMResult(
+                parsed=parsed,
+                model=model_name,
+                input_tokens=total_input,
+                output_tokens=total_output,
+                cost_usd=total_cost,
+                latency_ms=total_latency,
+                stop_reason="end_turn",
+                retried=retried,
+            )
+
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key).with_options(
+        timeout=90.0, max_retries=2
+    )
 
     while True:
         kwargs: dict[str, Any] = {
