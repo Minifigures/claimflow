@@ -303,9 +303,18 @@ export default function ClaimDetailPage() {
                       key={doc.id}
                       className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm"
                     >
-                      <span className="min-w-0 flex-1 truncate text-slate-900">
+                      <a
+                        href={
+                          doc.has_preview
+                            ? `/api/documents/${doc.id}/preview`
+                            : `/api/documents/${doc.id}/file`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-w-0 flex-1 truncate font-medium text-blue-800 underline-offset-2 hover:underline"
+                      >
                         {doc.filename}
-                      </span>
+                      </a>
                       <KindChip kind={doc.kind} />
                       <ModalityChip modality={doc.modality} />
                       <DicomBadge hasPreview={doc.has_preview} />
