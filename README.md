@@ -4,6 +4,8 @@ A human-in-the-loop medical insurance claims prototype: three review portals, th
 
 ## How it works
 
+![ClaimFlow architecture: three-stage pipeline with human gates and the AWS production reference](docs/architecture.png)
+
 ```mermaid
 flowchart TB
     UP["Claimant portal: claim wizard, document upload<br/>(DICOM / PNG / JPEG / PDF)"]
