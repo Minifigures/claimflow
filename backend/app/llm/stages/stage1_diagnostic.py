@@ -48,11 +48,35 @@ def _fallback_reason(exc: Exception) -> str:
     return "llm_error"
 
 
+def _load_image(image_path: Path):
+    """Open an upload for vision encoding; DICOM studies render via their pixel data."""
+    from PIL import Image
+
+    with image_path.open("rb") as fh:
+        head = fh.read(132)
+    is_dicom = (len(head) >= 132 and head[128:132] == b"DICM") or image_path.suffix.lower() in (
+        ".dcm",
+        ".dicom",
+    )
+    if is_dicom:
+        import pydicom
+
+        ds = pydicom.dcmread(image_path, force=True)
+        arr = ds.pixel_array.astype("float32")
+        lo, hi = float(arr.min()), float(arr.max())
+        arr = (arr - lo) / (hi - lo) * 255.0 if hi > lo else arr * 0.0
+        arr8 = arr.astype("uint8")
+        if arr8.ndim == 3:  # color or multi-frame: first plane
+            arr8 = arr8[..., 0] if arr8.shape[-1] in (3, 4) else arr8[0]
+        return Image.fromarray(arr8)
+    return Image.open(image_path)
+
+
 def _encode_image_b64(image_path: Path) -> str:
     """Downscale to <= MAX_IMAGE_LONG_EDGE on the long edge, re-encode JPEG in memory."""
     from PIL import Image
 
-    with Image.open(image_path) as opened:
+    with _load_image(image_path) as opened:
         image = opened.copy() if opened.mode in ("L", "RGB") else opened.convert("RGB")
     long_edge = max(image.size)
     if long_edge > MAX_IMAGE_LONG_EDGE:
@@ -101,7 +125,12 @@ def generate_diagnostic_report(
         if not llm_client.llm_available(settings):
             raise llm_client.LLMUnavailableError("anthropic API key missing or SDK not installed")
         system = _format_system(prompt.text, analysis)
-        image_b64 = _encode_image_b64(image_path)
+        try:
+            image_b64 = _encode_image_b64(image_path)
+        except Exception as exc:
+            # Whatever the upload turned out to be, vision prep must degrade to
+            # the deterministic fallback, never fail the stage.
+            raise llm_client.LLMUnavailableError(f"image preparation failed: {exc}") from exc
         context = (
             f"Claim #{claim_id}. Declared modality: {declared_modality or 'not declared'}. "
             f"Original upload media type: {image_media_type}. "
