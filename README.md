@@ -1,5 +1,7 @@
 # ClaimFlow
 
+**Live demo:** [claimflow-demo.vercel.app](https://claimflow-demo.vercel.app) (one-click demo roles) · API: [minifigures-claimflow-api.hf.space/docs](https://minifigures-claimflow-api.hf.space/docs)
+
 A human-in-the-loop medical insurance claims prototype: three review portals, three ML-assisted analysis stages, one auditable workflow. Claimants submit imaging claims (X-ray / CT / MRI); an imaging specialist, a medical specialist, and an insurance agent each review machine-generated analysis before any decision is made. The final decision dispatches the claimant's notification email atomically.
 
 ## How it works
@@ -13,15 +15,15 @@ flowchart TB
     subgraph S1["Stage 1, imaging analysis (automatic on submit)"]
         CNN["Modality CNN<br/>EfficientNet-B0, calibrated<br/>94.2% test accuracy"]
         FUSE["Authenticity fusion<br/>CNN capped at 0.40 + ELA + FFT + metadata<br/>DICOM-tag hard override"]
-        REP["Drafted diagnostic report<br/>Claude vision route, deterministic fallback"]
+        REP["Drafted diagnostic report<br/>LLM vision route, deterministic fallback"]
     end
     IMG["Imaging specialist portal<br/>forward / return to claimant"]
     subgraph S2["Stage 2, recommendation note"]
-        NOTE["Claude reads report + PDFs + per-claimant retrieval<br/>supports / insufficient / further testing"]
+        NOTE["LLM reads report + PDFs + per-claimant retrieval<br/>supports / insufficient / further testing"]
     end
     MED["Medical specialist portal<br/>send to insurer / request further testing"]
     subgraph S3["Stage 3, adjudication support"]
-        SUM["Claude summary over SQL claimant history +<br/>anonymized cross-claimant precedents (ChromaDB)"]
+        SUM["LLM summary over SQL claimant history +<br/>anonymized cross-claimant precedents (ChromaDB)"]
     end
     AGENT["Insurance agent portal<br/>approve / reject, decision + state + audit + email commit atomically"]
     AUDIT["Hash-chained, actor-aware audit log<br/>every transition, model call, retrieval, email"]
@@ -45,7 +47,7 @@ docker compose up --build      # or: make demo
 # frontend http://localhost:3000 — backend API http://localhost:8000
 ```
 
-Runs fully **keyless** by default: the imaging CNNs are local trained weights (no API involved), every LLM stage degrades to deterministic, schema-identical fallbacks, and email is logged to the console provider and surfaced in the UI. Set `ANTHROPIC_API_KEY` in `.env` for live Claude analysis (stage routing in `backend/app/llm/routing.py`).
+Runs fully **keyless** by default: the imaging CNNs are local trained weights (no API involved), every LLM stage degrades to deterministic, schema-identical fallbacks, and email is logged to the console provider and surfaced in the UI. Set `ANTHROPIC_API_KEY` (Claude stage routing in `backend/app/llm/routing.py`) or `GEMINI_API_KEY` (free-tier lane) in `.env` for live LLM analysis; the provider layer is pluggable behind one client.
 
 | Portal | Login | Password |
 |---|---|---|
@@ -62,7 +64,7 @@ Without Docker: `make install && make seed && make dev-api` and `make dev-web` (
 
 - **Modality classifier**: EfficientNet-B0 fine-tuned on 15,000 ROCOv2 radiology images (5,000/class, CUI-derived labels), temperature-calibrated — **94.2% test accuracy, ECE 0.016**. Trained weights ship in `backend/weights/` and serve by default (`MODEL_BACKEND=real`); `stub` remains the dependency-free fallback.
 - **Authenticity layer**: deterministic forensics (metadata/DICOM consistency, ELA, frequency, copy-move) fused with a CNN trained on generated tampering — capped so non-ML evidence can always override the model. Honest numbers and caveats in [docs/model-choices.md](docs/model-choices.md) and the model cards under `backend/ml_training/cards/`.
-- **LLM stages**: Claude (Sonnet vision / Opus reasoning / Haiku drafting) with structured outputs, stop-reason guardrails, per-call cost audit, and prompt-injection defenses for claimant-uploaded documents.
+- **LLM stages**: provider-pluggable behind one client — Claude routing (Sonnet vision / Opus reasoning / Haiku drafting) as primary, a Gemini free-tier lane powering the hosted demo, identical structured outputs, stop-reason guardrails, per-call cost audit, and prompt-injection defenses for claimant-uploaded documents. Both degrade to deterministic, schema-identical fallbacks.
 - **Retrieval**: per-claimant document search with isolation enforced inside the retriever, plus cross-claimant precedent retrieval through an allowlist anonymizer.
 
 ## Screenshots
@@ -75,6 +77,7 @@ The demo star: a deliberately tampered X-ray (copy-move + splice on a real radio
 |---|---|
 | <img src="docs/screenshots/imaging-queue.png" alt="Imaging specialist queue" width="420" /> | <img src="docs/screenshots/agent-dossier.png" alt="Insurance agent dossier with adjudication summary and decision controls" width="420" /> |
 | <img src="docs/screenshots/specialist-recommendation.png" alt="Medical specialist recommendation note" width="420" /> | <img src="docs/screenshots/claimant-timeline-approved.png" alt="Claimant timeline for an approved claim" width="420" /> |
+| <img src="docs/screenshots/landing.png" alt="Landing page" width="420" /> | <img src="docs/screenshots/login.png" alt="Login with one-click demo roles" width="420" /> |
 
 ## Requirements traceability
 
@@ -101,11 +104,11 @@ The demo star: a deliberately tampered X-ray (copy-move + splice on a real radio
 
 ```bash
 make test   # backend: pytest (state machine matrix, audit tamper, PII guards,
-            # injection cases, real-CNN serving path, full lifecycle E2E) — 242 tests
+            # injection cases, real-CNN serving path, full lifecycle E2E) — 253 tests
 make lint
 cd frontend && npx tsc --noEmit && npm run build
 ```
 
 ## Stack
 
-FastAPI · SQLAlchemy 2 / SQLite (Postgres-ready) · Next.js App Router / TypeScript strict · PyTorch + timm · ChromaDB + sentence-transformers · Anthropic API (Bedrock as the documented production path)
+FastAPI · SQLAlchemy 2 / SQLite (Postgres-ready) · Next.js App Router / TypeScript strict · PyTorch + timm · ChromaDB + sentence-transformers · Anthropic + Gemini APIs behind one provider-pluggable LLM client (Bedrock as the documented production path) · Docker Compose demo, deployed on Vercel + Hugging Face Spaces
