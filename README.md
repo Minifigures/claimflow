@@ -45,6 +45,21 @@ Without Docker: `make install && make seed && make dev-api` and `make dev-web` (
 - **LLM stages**: Claude (Sonnet vision / Opus reasoning / Haiku drafting) with structured outputs, stop-reason guardrails, per-call cost audit, and prompt-injection defenses for claimant-uploaded documents.
 - **Retrieval**: per-claimant document search with isolation enforced inside the retriever, plus cross-claimant precedent retrieval through an allowlist anonymizer.
 
+## Requirements traceability
+
+| Brief requirement | Implementation | Verified by |
+|---|---|---|
+| Claim intake with imaging (X-ray / CT / MRI) | Claimant portal (`/claimant`) wizard; `POST /api/claims`, `POST /api/documents/upload/{claim_id}` — magic-byte sniffing, DICOM PHI de-identification at rest, safe-metadata allowlist | `test_claims.py`, `test_documents.py` |
+| §1 ML analyzes the image by type and generates a structured diagnostic report | Stage-1 pipeline (`app/services/inference_runner.py`): modality CNN + authenticity fusion (`app/ml/imaging/real.py`, stub fallback) + drafted report (`app/llm/`) | `test_inference_runner.py`, `test_real_analyzer.py`, `test_llm_documents.py` |
+| §1 responsible specialist reviews, forwards or returns | Imaging portal (`/imaging`); `GET /api/specialist/queue`, `POST .../forward`, `POST .../return` | `test_specialist_flow.py` |
+| §2 ML reads all submitted documents and generates a recommendation note (supports / insufficient / further testing) | Stage-2 runner over imaging report + extracted PDF text + per-claimant retrieval; `POST /api/specialist/cases/{id}/regenerate` | `test_llm_stages.py`, `test_rag.py` |
+| §2 specialist sends the package to the insurance company | Medical portal (`/specialist`); `POST .../send-to-insurer`, `POST .../request-further-testing` | `test_specialist_flow.py` |
+| §3 ML summarizes note + report + claimant history from the database | Stage-3 adjudication summary: SQL claimant history + anonymized cross-claimant precedents (Chroma); agent dossier `GET /api/agent/cases/{claim_id}` | `test_agent_flow.py`, `test_rag.py` |
+| §3 agent decides; system immediately emails the claimant | Agent portal (`/agent`) decision modal; `POST /api/agent/cases/{id}/decision` — decision, state transition, audit row, and email dispatch commit atomically | `test_agent_flow.py`, `test_notifications.py` |
+| Identify the model type for each ML step and justify it | [docs/model-choices.md](docs/model-choices.md) — per-stage selection, rationale, cost and governance mapping | — |
+| Mocked outputs acceptable | Exceeded: trained CNNs + live LLM path; keyless mode serves deterministic, schema-identical fallbacks so the full flow demos with zero keys | `test_llm_fallbacks.py` |
+| Humans stay in the loop for final decisions | State machine permits no auto-decision: every transition is a role-gated human action on machine-drafted evidence, recorded in the hash-chained audit log | `test_state_machine.py`, `test_audit.py` |
+
 ## Docs
 
 - [docs/design.md](docs/design.md) — architecture, state machine, sequence diagrams, production path
