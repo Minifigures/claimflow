@@ -124,6 +124,10 @@ The prototype makes deliberately small infrastructure choices with a named produ
 | ChromaDB (local, persistent) | pgvector or LanceDB | embeddings always passed explicitly, so the store is swappable |
 | Seeded users + JWT cookie | SSO (OIDC) + the same role model | role enforcement lives in the state machine and deps, not the identity provider |
 
+### Where Redis and Kafka would slot in (and why they are not in the prototype)
+
+The stage runners are already queue-shaped (own session, status walk, never raise), so the broker is a swappable detail. SQS is the named production choice because it is managed, at-least-once, and zero-ops; a self-hosted **Redis** broker (arq/RQ) is the right call only when sub-second dispatch latency or an existing Redis (sessions, rate limiting, idempotency keys for the decision endpoint) justifies operating it. **Kafka** earns its place one step later, at the event-streaming tier: the hash-chained audit log is an event stream in disguise, and in production each audit append would also publish to a `claim-events` topic feeding fraud analytics, SLA dashboards, and model-drift monitors without touching the transactional path. Neither belongs in a reviewer-run prototype: two more stateful services in `docker compose` means two more ways `make demo` fails on a machine we do not control, and the runner contract already proves the architectural seam they would occupy.
+
 ## Failure handling
 
 - **Orphan recovery.** Artifacts stuck in `running` after a crash are marked failed at startup (`recover_orphans` in `backend/app/services/inference_runner.py`, wired into the FastAPI lifespan in `backend/app/main.py`), with the reason preserved on the row.

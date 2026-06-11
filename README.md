@@ -25,7 +25,7 @@ docker compose up --build      # or: make demo
 # frontend http://localhost:3000 — backend API http://localhost:8000
 ```
 
-Runs fully **keyless** by default: every ML/LLM stage degrades to deterministic, schema-identical fallbacks, and email is logged to the console provider and surfaced in the UI. Set `ANTHROPIC_API_KEY` in `.env` for live Claude analysis (stage routing in `backend/app/llm/routing.py`).
+Runs fully **keyless** by default: the imaging CNNs are local trained weights (no API involved), every LLM stage degrades to deterministic, schema-identical fallbacks, and email is logged to the console provider and surfaced in the UI. Set `ANTHROPIC_API_KEY` in `.env` for live Claude analysis (stage routing in `backend/app/llm/routing.py`).
 
 | Portal | Login | Password |
 |---|---|---|
@@ -70,7 +70,7 @@ Without Docker: `make install && make seed && make dev-api` and `make dev-web` (
 
 ```bash
 make test   # backend: pytest (state machine matrix, audit tamper, PII guards,
-            # injection cases, full lifecycle E2E) — 220+ tests
+            # injection cases, real-CNN serving path, full lifecycle E2E) — 251 tests
 make lint
 cd frontend && npx tsc --noEmit && npm run build
 ```
