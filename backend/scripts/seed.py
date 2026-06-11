@@ -310,13 +310,16 @@ def _attach_seed_asset(
     target = target_dir / asset_name  # keep the filename ('tampered' drives the demo)
     shutil.copyfile(source, target)
 
-    # Mirror the upload router's DICOM branch: de-identify in place, extract the
-    # safe metadata dict (the analyzer's metadata signal reads it), render preview.
+    # Mirror the upload router's DICOM branch: extract the safe metadata dict
+    # (the analyzer's metadata signal reads it) and render the preview. The
+    # at-rest rewrite is skipped: seed fixtures are synthetic and PHI-free by
+    # construction, and in-place rewrites have proven filesystem-sensitive on
+    # some hosts (Hugging Face Spaces).
     sniffed = sniff_kind(target, "")
     dicom_meta_json: str | None = None
     preview_path: str | None = None
     if sniffed == "dicom":
-        meta, preview_path = process_dicom(target)
+        meta, preview_path = process_dicom(target, rewrite=False)
         dicom_meta_json = json.dumps(meta)
     mime = {"dicom": "application/dicom", "png": "image/png", "jpeg": "image/jpeg"}[sniffed]
     data = target.read_bytes()

@@ -55,13 +55,17 @@ def sniff_kind(path: Path, mime: str) -> str:
     raise ValueError("unsupported file type")
 
 
-def process_dicom(path: Path) -> tuple[dict, str | None]:
+def process_dicom(path: Path, *, rewrite: bool = True) -> tuple[dict, str | None]:
     """De-identify a DICOM file *in place*, extract safe metadata, render a preview.
 
     Every denylisted PHI tag present is blanked and the file rewritten on disk
     before returning, so the study is de-identified at rest. Returns
     (meta, preview_path); preview_path is None when pixel data is missing or
     unreadable. Raises ValueError for non-DICOM input.
+
+    ``rewrite=False`` skips the at-rest rewrite for callers whose input is
+    synthetic and PHI-free by construction (the demo seeder); metadata and
+    preview extraction behave identically.
     """
     try:
         ds = pydicom.dcmread(path, force=True)
@@ -91,7 +95,19 @@ def process_dicom(path: Path) -> tuple[dict, str | None]:
     if pixel_spacing is not None:
         meta["PixelSpacing"] = str(pixel_spacing)
 
-    ds.save_as(path, enforce_file_format=True)  # rewrite: de-identified at rest
+    if rewrite:
+        ds.save_as(path, enforce_file_format=True)  # rewrite: de-identified at rest
+        with path.open("rb") as fh:
+            head = fh.read(132)
+        if len(head) < 132 or head[128:132] != _MAGIC_DICM:
+            import logging
+
+            logging.getLogger("claimflow.dicom").error(
+                "post-rewrite verification failed for %s: size=%d head=%s",
+                path,
+                path.stat().st_size,
+                head[:16].hex(),
+            )
 
     preview = path.with_suffix(".png")
     try:
