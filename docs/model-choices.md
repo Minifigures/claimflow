@@ -25,11 +25,11 @@ The assessment asks one question per ML-powered step: given a real production co
 
 | Metric (test split) | Value |
 |---|---|
-| Accuracy | [PENDING_EVAL: test accuracy] |
-| Macro-F1 | [PENDING_EVAL: test macro-F1] |
-| Per-class precision/recall (ct, mri, xray) | [PENDING_EVAL: per-class table] |
-| ECE before / after temperature scaling | [PENDING_EVAL: ece pre/post] |
-| Fitted temperature | [PENDING_EVAL: temperature] |
+| Accuracy | 0.942 (n=1,543) |
+| Macro-F1 | 0.943 |
+| Per-class precision/recall (ct, mri, xray) | ct 0.92/0.93 · mri 0.91/0.92 · xray 1.00/0.98 |
+| ECE before / after temperature scaling | 0.030 → 0.016 |
+| Fitted temperature | 1.90 |
 
 **Alternatives considered.** ResNet-50: 4-5x the parameters for marginal gain on a closed 3-class problem, and slower on the CPU-only serving path. MobileNetV3: faster, but a lower accuracy ceiling, and we run inference asynchronously in a background task where EfficientNet-B0 CPU latency is already fine. Zero-shot VLMs (MedGemma and similar): attractive for zero training cost, rejected for the primary path because they emit no calibrated class probability (nothing to temperature-scale, so nothing principled to gate review on), carry a much heavier serving footprint, and are less reproducible run to run. A VLM remains a good cross-check, which is exactly how stage 1c uses one (it independently assesses modality and records agreement with the classifier).
 
@@ -43,8 +43,10 @@ The assessment asks one question per ML-powered step: given a real production co
 
 | Metric (test split) | Value |
 |---|---|
-| Accuracy / macro-F1 | [PENDING_EVAL: authenticity test metrics] |
-| Clean-resaved-real false positive rate (fusion, to "suspicious") | [PENDING_EVAL: clean-resave FPR] |
+| Accuracy / macro-F1 | 0.696 / 0.694 (n=3,086; fake P/R 0.73/0.61, real P/R 0.67/0.78; ECE 0.122 → 0.028 at T=2.28) |
+| Clean-resaved-real false positive rate (fusion, to "suspicious") | 0.298 to suspicious, 0.000 to likely_fraudulent (n=500; mean risk 0.29, max 0.64) |
+
+Read together, these numbers are the design working as intended: the ~0.70 CNN is what an honest tampering detector looks like once the resave shortcut is closed (a 0.99 here would mean the model found a leak), and the fusion routes roughly 3 in 10 worst-case clean resaves to an extra human look while never condemning one outright — acceptable for a tripwire whose every non-authentic verdict lands on a specialist's queue, not on the claimant.
 
 **Honesty.** This detector detects our generated tampering family. It is not a real-world fraud detector, and we say so in the UI copy and the model card language. The gap on unseen generators (modern diffusion inpainting, GAN-based synthesis) is unverified. This honesty reflects the state of the field: the medical-image forensics datasets we would want (CTForensics, MedForensics) are unreleased; SynthCheX covers chest X-ray only; and a 2025 RSNA study reported radiologists detecting AI-manipulated medical images at roughly 75% accuracy, so the human backstop is real but not sufficient either. A claims pipeline should treat image forensics as a tripwire, not a verdict.
 

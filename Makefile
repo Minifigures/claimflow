@@ -1,7 +1,7 @@
 .PHONY: install test lint dev-api seed demo demo-down
 
 install:
-	cd backend && uv venv && uv pip install -e ".[dev]"
+	cd backend && uv venv && uv pip install -e ".[dev,ml,rag]"
 
 test:
 	cd backend && uv run pytest -q

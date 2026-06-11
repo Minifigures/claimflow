@@ -40,8 +40,8 @@ Without Docker: `make install && make seed && make dev-api` and `make dev-web` (
 
 ## What's real
 
-- **Modality classifier**: EfficientNet-B0 fine-tuned on 15,000 ROCOv2 radiology images (5,000/class, CUI-derived labels), temperature-calibrated. `MODEL_BACKEND=real` serves it; `stub` (default) keeps the demo dependency-free.
-- **Authenticity layer**: deterministic forensics (metadata/DICOM consistency, ELA, frequency, copy-move) fused with a CNN trained on generated tampering — capped so non-ML evidence can always override the model. Honesty caveats in [docs/model-choices.md](docs/model-choices.md).
+- **Modality classifier**: EfficientNet-B0 fine-tuned on 15,000 ROCOv2 radiology images (5,000/class, CUI-derived labels), temperature-calibrated — **94.2% test accuracy, ECE 0.016**. Trained weights ship in `backend/weights/` and serve by default (`MODEL_BACKEND=real`); `stub` remains the dependency-free fallback.
+- **Authenticity layer**: deterministic forensics (metadata/DICOM consistency, ELA, frequency, copy-move) fused with a CNN trained on generated tampering — capped so non-ML evidence can always override the model. Honest numbers and caveats in [docs/model-choices.md](docs/model-choices.md) and the model cards under `backend/ml_training/cards/`.
 - **LLM stages**: Claude (Sonnet vision / Opus reasoning / Haiku drafting) with structured outputs, stop-reason guardrails, per-call cost audit, and prompt-injection defenses for claimant-uploaded documents.
 - **Retrieval**: per-claimant document search with isolation enforced inside the retriever, plus cross-claimant precedent retrieval through an allowlist anonymizer.
 
