@@ -65,6 +65,17 @@ Without Docker: `make install && make seed && make dev-api` and `make dev-web` (
 - **LLM stages**: Claude (Sonnet vision / Opus reasoning / Haiku drafting) with structured outputs, stop-reason guardrails, per-call cost audit, and prompt-injection defenses for claimant-uploaded documents.
 - **Retrieval**: per-claimant document search with isolation enforced inside the retriever, plus cross-claimant precedent retrieval through an allowlist anonymizer.
 
+## Screenshots
+
+The demo star: a deliberately tampered X-ray (copy-move + splice on a real radiograph, wrapped in a DICOM whose Modality tag contradicts the declared modality) caught by the fusion and routed to mandatory human review.
+
+<img src="docs/screenshots/imaging-tampered-case.png" alt="Imaging specialist review of the tampered demo claim: suspicious verdict, per-signal forensic findings, mandatory review" width="720" />
+
+| | |
+|---|---|
+| <img src="docs/screenshots/imaging-queue.png" alt="Imaging specialist queue" width="420" /> | <img src="docs/screenshots/agent-dossier.png" alt="Insurance agent dossier with adjudication summary and decision controls" width="420" /> |
+| <img src="docs/screenshots/specialist-recommendation.png" alt="Medical specialist recommendation note" width="420" /> | <img src="docs/screenshots/claimant-timeline-approved.png" alt="Claimant timeline for an approved claim" width="420" /> |
+
 ## Requirements traceability
 
 | Brief requirement | Implementation | Verified by |
