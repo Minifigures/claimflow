@@ -6,6 +6,10 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+# Rewrites are compiled into the routes manifest at build time, so the backend
+# origin must be known here; "backend" is the compose service hostname.
+ARG BACKEND_URL=http://backend:8000
+ENV BACKEND_URL=$BACKEND_URL
 RUN npm run build
 
 FROM node:20-alpine
