@@ -65,6 +65,30 @@ def _invalid_assets() -> list[str]:
     return bad
 
 
+def _llm_lane_probe() -> None:
+    """Log (never fail on) the live-LLM lane state: key presence and one ping."""
+    key = os.environ.get("GEMINI_API_KEY", "")
+    print(f"[bootstrap] GEMINI_API_KEY present={bool(key)} len={len(key)}", flush=True)
+    if not key:
+        return
+    try:
+        import httpx
+
+        response = httpx.post(
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            "gemini-2.5-flash:generateContent",
+            headers={"x-goog-api-key": key},
+            json={
+                "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
+                "generationConfig": {"maxOutputTokens": 16},
+            },
+            timeout=20,
+        )
+        print(f"[bootstrap] gemini ping status={response.status_code}", flush=True)
+    except Exception as exc:
+        print(f"[bootstrap] gemini ping failed: {exc!r}", flush=True)
+
+
 def main() -> None:
     # Code fingerprints: lets the logs prove which build is actually running.
     import hashlib
@@ -73,6 +97,7 @@ def main() -> None:
         digest = hashlib.sha256(Path(code_file).read_bytes()).hexdigest()[:12]
         print(f"[bootstrap] code {code_file} sha={digest}", flush=True)
 
+    _llm_lane_probe()
     bad = _invalid_assets()
     if not bad:
         print("[bootstrap] all required assets valid; nothing to do", flush=True)
