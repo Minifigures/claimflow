@@ -66,6 +66,13 @@ def _invalid_assets() -> list[str]:
 
 
 def main() -> None:
+    # Code fingerprints: lets the logs prove which build is actually running.
+    import hashlib
+
+    for code_file in ("app/ml/imaging/real.py", "scripts/seed.py"):
+        digest = hashlib.sha256(Path(code_file).read_bytes()).hexdigest()[:12]
+        print(f"[bootstrap] code {code_file} sha={digest}", flush=True)
+
     bad = _invalid_assets()
     if not bad:
         print("[bootstrap] all required assets valid; nothing to do", flush=True)

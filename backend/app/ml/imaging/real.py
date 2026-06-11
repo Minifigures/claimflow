@@ -128,8 +128,16 @@ def _load_grayscale(path: Path) -> tuple[Image.Image, bool]:
         # valid dataset (dcmread force=True handles it).
         try:
             return _dicom_to_pil(path).convert("L"), True
-        except Exception:
-            pass  # fall through to PIL so the error names the real problem
+        except Exception as dicom_exc:
+            try:
+                return Image.open(path).convert("L"), False
+            except Exception as pil_exc:
+                with path.open("rb") as fh:
+                    head = fh.read(16)
+                raise ValueError(
+                    f"unreadable study {path.name}: size={path.stat().st_size} "
+                    f"head={head.hex()} dicom_error={dicom_exc!r} pil_error={pil_exc!r}"
+                ) from pil_exc
     return Image.open(path).convert("L"), False
 
 
