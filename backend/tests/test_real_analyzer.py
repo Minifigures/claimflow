@@ -301,3 +301,40 @@ def test_run_stage1_with_real_backend(
     ).all()
     assert len(llm_events) == 1
     assert json.loads(llm_events[0].payload_json)["backend"] == "real"
+
+
+def test_preamble_less_dicom_still_loads(weights_dir: Path, settings: Settings, tmp_path: Path):
+    """In-place de-identification can rewrite studies without the 128-byte preamble
+    (pydicom version dependent); the loader must still read them as DICOM."""
+    import pydicom
+    from pydicom.dataset import Dataset, FileMetaDataset
+    from pydicom.uid import CTImageStorage, ExplicitVRLittleEndian, generate_uid
+
+    file_meta = FileMetaDataset()
+    file_meta.MediaStorageSOPClassUID = CTImageStorage
+    file_meta.MediaStorageSOPInstanceUID = generate_uid()
+    file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    ds = Dataset()
+    ds.file_meta = file_meta
+    ds.SOPClassUID = CTImageStorage
+    ds.SOPInstanceUID = file_meta.MediaStorageSOPInstanceUID
+    ds.Modality = "CT"
+    ds.Rows = 320
+    ds.Columns = 320
+    ds.SamplesPerPixel = 1
+    ds.PhotometricInterpretation = "MONOCHROME2"
+    ds.BitsAllocated = 8
+    ds.BitsStored = 8
+    ds.HighBit = 7
+    ds.PixelRepresentation = 0
+    ds.PixelData = _gradient_image().tobytes()
+    full = tmp_path / "full.dcm"
+    pydicom.dcmwrite(full, ds, enforce_file_format=True)
+
+    stripped = tmp_path / "stripped.dcm"
+    stripped.write_bytes(full.read_bytes()[132:])  # drop preamble + DICM marker
+
+    analyzer = get_analyzer(settings)
+    analysis = analyzer.analyze(stripped, declared_modality="ct", dicom_meta={"Modality": "CT"})
+    assert analysis.backend == "real"
+    assert "non_dicom_upload" not in analysis.quality_flags

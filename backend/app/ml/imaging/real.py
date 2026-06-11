@@ -122,6 +122,14 @@ def _dicom_to_pil(path: Path) -> Image.Image:
 def _load_grayscale(path: Path) -> tuple[Image.Image, bool]:
     if _is_dicom(path):
         return _dicom_to_pil(path).convert("L"), True
+    if path.suffix.lower() in (".dcm", ".dicom"):
+        # De-identification rewrites studies in place; some pydicom versions
+        # write them preamble-less, which fails the magic check but is still a
+        # valid dataset (dcmread force=True handles it).
+        try:
+            return _dicom_to_pil(path).convert("L"), True
+        except Exception:
+            pass  # fall through to PIL so the error names the real problem
     return Image.open(path).convert("L"), False
 
 
