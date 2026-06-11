@@ -745,6 +745,34 @@ def seed_fixtures(session: Session, settings: Settings) -> list[str]:
     return list(FIXTURE_STATES)
 
 
+def _heal_partial_fixtures(session: Session, settings: Settings) -> bool:
+    """Self-heal a half-seeded demo (a previous run died between per-step commits).
+
+    A partial fixture set is worse than an empty database: the portals show a
+    handful of claims in the wrong states and the count gate would silently skip
+    reseeding forever. Detect it by fixture claim_ref, then wipe ALL demo state
+    (schema, uploads, vector store) and let the caller reseed from zero.
+    """
+    fixture_refs = set(FIXTURE_STATES)
+    existing_refs = set(
+        session.scalars(select(Claim.claim_ref).where(Claim.claim_ref.in_(list(fixture_refs))))
+    )
+    if not existing_refs or existing_refs == fixture_refs:
+        return False
+    print(
+        f"partial fixture seed detected ({len(existing_refs)}/{len(fixture_refs)} demo claims); "
+        "wiping demo state and reseeding from scratch",
+        flush=True,
+    )
+    bind = session.get_bind()
+    session.rollback()
+    db.Base.metadata.drop_all(bind=bind)
+    db.Base.metadata.create_all(bind=bind)
+    shutil.rmtree(settings.chroma_dir, ignore_errors=True)
+    shutil.rmtree(settings.upload_dir, ignore_errors=True)
+    return True
+
+
 def seed_database(
     session: Session,
     settings: Settings | None = None,
@@ -752,6 +780,9 @@ def seed_database(
     fixtures: bool = True,
 ) -> SeedSummary:
     summary = SeedSummary()
+    settings = settings or Settings()
+    if fixtures:
+        _heal_partial_fixtures(session, settings)
     for spec in DEMO_USERS:
         if session.scalar(select(User.id).where(User.email == spec.email)) is not None:
             summary.users_skipped.append(spec.email)
@@ -790,7 +821,6 @@ def seed_database(
     if fixtures:
         existing_claims = session.scalar(select(func.count()).select_from(Claim)) or 0
         if existing_claims == 0:
-            settings = settings or Settings()
             summary.precedents_indexed = seed_precedents(settings)
             summary.fixture_claims = seed_fixtures(session, settings)
     return summary

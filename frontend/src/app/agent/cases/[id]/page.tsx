@@ -42,12 +42,16 @@ export default function AgentCasePage() {
   const summaryBusy =
     summary === null || summaryStatus === "pending" || summaryStatus === "running";
 
-  // Poll every 2s while the adjudication summary is still being produced; the
-  // decision buttons stay disabled until the analysis completes.
+  // Poll every 2s while the adjudication summary is still being produced, and
+  // keep polling pre-adjudication so a claim advancing while the page is open
+  // picks up the decision controls; stop only on terminal states.
+  const claimState = dossier?.claim.state ?? null;
+  const isTerminal = claimState === "APPROVED" || claimState === "REJECTED";
+  const isAdjudication = claimState === "ADJUDICATION";
   const shouldPoll =
     !fatal &&
     !invalidId &&
-    (dossier === null || (dossier.claim.state === "ADJUDICATION" && summaryBusy));
+    (dossier === null || (!isTerminal && !isAdjudication) || (isAdjudication && summaryBusy));
 
   useEffect(() => {
     if (invalidId) {
@@ -109,10 +113,6 @@ export default function AgentCasePage() {
   };
 
   const displayError = invalidId ? "Invalid claim id." : error;
-  const isAdjudication = dossier !== null && dossier.claim.state === "ADJUDICATION";
-  const isTerminal =
-    dossier !== null &&
-    (dossier.claim.state === "APPROVED" || dossier.claim.state === "REJECTED");
 
   const decisionEntry =
     dossier !== null

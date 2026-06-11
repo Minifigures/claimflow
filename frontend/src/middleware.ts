@@ -16,6 +16,12 @@ const ROUTE_ROLES: ReadonlyArray<readonly [prefix: string, role: Role]> = [
   ["/agent", "insurance_agent"],
 ];
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
+  console.warn(
+    "JWT_SECRET is not set; using the demo default. The backend must sign with the same value or every login will bounce.",
+  );
+}
+
 function jwtSecret(): Uint8Array {
   return new TextEncoder().encode(process.env.JWT_SECRET ?? DEFAULT_DEV_SECRET);
 }

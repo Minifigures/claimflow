@@ -47,10 +47,17 @@ function ResubmitPanel({ claimId, disabled, onResubmitted }: ResubmitPanelProps)
   const [extraDocs, setExtraDocs] = useState<DocumentOut[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stagedCount, setStagedCount] = useState(0);
 
   const handleResubmit = async () => {
     if (note.trim().length === 0) {
       setError("Please add a note describing what you changed or added.");
+      return;
+    }
+    if (stagedCount > 0) {
+      setError(
+        `${stagedCount} file(s) are staged but not uploaded yet. Upload each one (or remove it) before resubmitting, otherwise it will not be attached.`,
+      );
       return;
     }
     setError(null);
@@ -94,6 +101,7 @@ function ResubmitPanel({ claimId, disabled, onResubmitted }: ResubmitPanelProps)
           uploaded={extraDocs}
           onUploaded={(doc) => setExtraDocs((prev) => [...prev, doc])}
           disabled={disabled || submitting}
+          onStagedCountChange={setStagedCount}
         />
       </div>
 
@@ -127,13 +135,16 @@ export default function ClaimDetailPage() {
 
   const reportStatus = detail?.diagnostic_report?.status ?? null;
   // Poll while the report is still being produced or the claim is freshly
-  // (re)submitted; stop once the workflow has moved on.
+  // (re)submitted; stop on terminal states, and never wait on a diagnostic
+  // report for claim types that do not produce one.
+  const terminal = detail?.state === "APPROVED" || detail?.state === "REJECTED";
   const shouldPoll =
-    detail === null ||
-    detail.state === "SUBMITTED" ||
-    detail.diagnostic_report === null ||
-    reportStatus === "pending" ||
-    reportStatus === "running";
+    !terminal &&
+    (detail === null ||
+      detail.state === "SUBMITTED" ||
+      (detail.claim_type === "imaging" && detail.diagnostic_report === null) ||
+      reportStatus === "pending" ||
+      reportStatus === "running");
 
   useEffect(() => {
     if (invalidId) {

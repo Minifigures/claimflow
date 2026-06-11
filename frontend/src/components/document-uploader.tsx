@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { DicomBadge, KindChip, ModalityChip } from "@/components/document-chips";
 import { UploadDropzone } from "@/components/upload-dropzone";
@@ -34,6 +34,9 @@ interface DocumentUploaderProps {
   uploaded: DocumentOut[];
   onUploaded: (doc: DocumentOut) => void;
   disabled?: boolean;
+  /** Notifies the parent how many files are staged but not yet uploaded, so
+   * surrounding actions (e.g. resubmit) can refuse to silently drop them. */
+  onStagedCountChange?: (count: number) => void;
 }
 
 let nextLocalId = 1;
@@ -48,8 +51,13 @@ export function DocumentUploader({
   uploaded,
   onUploaded,
   disabled = false,
+  onStagedCountChange,
 }: DocumentUploaderProps) {
   const [staged, setStaged] = useState<StagedFile[]>([]);
+
+  useEffect(() => {
+    onStagedCountChange?.(staged.length);
+  }, [staged.length, onStagedCountChange]);
 
   const addFiles = (files: File[]) => {
     setStaged((prev) => [

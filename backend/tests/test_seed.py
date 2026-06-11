@@ -270,3 +270,45 @@ def test_second_seed_run_adds_nothing(
         for model in (Claim, Document, Decision, Notification, AuditEvent)
     }
     assert after == before
+
+
+def test_partial_fixture_seed_self_heals(tmp_path: Path) -> None:
+    """A half-seeded demo (some fixture refs present, not all) wipes and reseeds."""
+    from app.auth.passwords import hash_password
+    from scripts.seed import _heal_partial_fixtures
+
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path}/heal.sqlite",
+        upload_dir=tmp_path / "uploads",
+        chroma_dir=tmp_path / "chroma",
+        model_backend="stub",
+        anthropic_api_key="",
+    )
+    create_app(settings)
+    factory = db.get_session_factory()
+    with factory() as session:
+        claimant = User(
+            email="partial@demo.ca",
+            password_hash=hash_password("demo1234"),
+            role=Role.CLAIMANT,
+            full_name="Partial Seed",
+            member_id="MBR-0000",
+        )
+        session.add(claimant)
+        session.flush()
+        session.add(
+            Claim(
+                claim_ref=REF_IMAGING_TAMPERED,
+                claimant_id=claimant.id,
+                claim_type="imaging",
+                state=ClaimState.SUBMITTED,
+            )
+        )
+        session.commit()
+
+        assert _heal_partial_fixtures(session, settings) is True
+        assert (session.scalar(select(func.count()).select_from(Claim)) or 0) == 0
+        assert (session.scalar(select(func.count()).select_from(User)) or 0) == 0
+
+        # And a complete set (or empty DB) must NOT trigger the wipe.
+        assert _heal_partial_fixtures(session, settings) is False

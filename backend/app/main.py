@@ -5,6 +5,12 @@ from fastapi import FastAPI
 from app import db
 from app.config import Settings, get_settings
 
+# Known placeholder secrets (config default + .env.example value): loudly warn
+# when one of them is live so a real deployment can never run on them silently.
+_DEMO_GRADE_SECRETS = frozenset(
+    {"dev-only-secret-change-me-0123456789abcdef", "change-me-to-a-long-random-string"}
+)
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
@@ -15,12 +21,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        import logging
+
         from app.services.inference_runner import recover_orphans
 
+        if settings.jwt_secret in _DEMO_GRADE_SECRETS:
+            logging.getLogger("claimflow").warning(
+                "JWT_SECRET is a known demo default — fine for local demos, "
+                "set a real secret for any reachable deployment"
+            )
         orphaned = recover_orphans(app)
         if orphaned:
-            import logging
-
             logging.getLogger("claimflow").warning(
                 "marked %d orphaned running artifacts as failed", orphaned
             )
