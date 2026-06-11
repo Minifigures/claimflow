@@ -25,7 +25,13 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # frontend: Next.js portal service will be added here in a later stage
-  #   build: ./frontend
-  #   ports:
-  #     - "3000:3000"
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
