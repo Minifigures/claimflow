@@ -29,5 +29,6 @@ RUN pip install --no-cache-dir --no-deps . \
 EXPOSE 8000
 
 # Standalone runs (e.g. Hugging Face Spaces, which runs containers as uid 1000)
-# seed the demo data before serving; compose overrides this with the same chain.
-CMD ["sh", "-c", "python -m scripts.seed && uvicorn app.main:get_application --factory --host 0.0.0.0 --port 8000"]
+# materialize any LFS-pointer assets, seed the demo data, then serve; compose
+# overrides this with its own seed-and-serve chain.
+CMD ["sh", "-c", "python -m scripts.bootstrap_assets && python -m scripts.seed && uvicorn app.main:get_application --factory --host 0.0.0.0 --port 8000"]
