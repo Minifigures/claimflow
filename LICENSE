@@ -1,0 +1,17 @@
+Copyright (c) 2026 Marco Anthony Ayuste. All rights reserved.
+
+This repository is made available solely so that prospective employers,
+interviewers, and collaborators can view, clone, and run the code to evaluate
+the author's work. No other rights are granted. Without the author's prior
+written permission, you may not use, copy, modify, merge, publish, distribute,
+sublicense, sell, or train machine-learning models on any part of this
+repository, except as required for the evaluation purpose above.
+
+Third-party components remain under their own licenses: Python and JavaScript
+dependencies per their package manifests, the vendored all-MiniLM-L6-v2 model
+(Apache-2.0), and demo radiology images derived from the ROCOv2 dataset
+(CC BY-NC-SA 4.0; see backend/seed-assets/ATTRIBUTION.md).
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
