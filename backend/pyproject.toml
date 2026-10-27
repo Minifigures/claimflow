@@ -19,6 +19,7 @@ dependencies = [
     "pydicom>=2.4",
     "pillow>=10.3",
     "pyyaml>=6.0",
+    "certifi>=2026.10.23",
 ]
 
 [project.optional-dependencies]
